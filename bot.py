@@ -9,9 +9,21 @@ from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
+from inspect import signature
+
 from adminbot.config import BotConfig
 from adminbot.database import Database, format_entries
 from adminbot.embeds import log_embed, punishment_embed, release_embed
+
+
+def _supports_localizations(callable_obj) -> bool:
+    """Return True if the callable accepts localization keyword arguments."""
+
+    try:
+        params = signature(callable_obj).parameters
+    except (TypeError, ValueError):
+        return False
+    return "name_localizations" in params and "description_localizations" in params
 
 
 def role_required(role_id: int) -> app_commands.Check:
@@ -37,23 +49,31 @@ class HanbyeolBot(commands.Bot):
         self.config = config
         self.database = Database(config.database_path)
 
-        self.hanbyeol = app_commands.Group(
-            name="hanbyeol",
-            description="Hanbyeol administration commands.",
-            name_localizations={"ko": "한별"},
-            description_localizations={"ko": "한별 서버 관리 명령어."},
-        )
+        group_kwargs: dict[str, object] = {
+            "name": "hanbyeol",
+            "description": "Hanbyeol administration commands.",
+        }
+        if _supports_localizations(app_commands.Group.__init__):
+            group_kwargs["name_localizations"] = {"ko": "한별"}
+            group_kwargs["description_localizations"] = {"ko": "한별 서버 관리 명령어."}
+
+        self.hanbyeol = app_commands.Group(**group_kwargs)
         self.tree.add_command(self.hanbyeol)
 
         self._register_commands()
 
     def _register_commands(self) -> None:
-        @self.hanbyeol.command(
-            name="send_punishment",
-            description="Send a punishment notification to the configured channel.",
-            name_localizations={"ko": "처벌정보전송"},
-            description_localizations={"ko": "처벌 정보를 채널에 전송하고 데이터베이스에 저장합니다."},
-        )
+        punishment_kwargs: dict[str, object] = {
+            "name": "send_punishment",
+            "description": "Send a punishment notification to the configured channel.",
+        }
+        if _supports_localizations(self.hanbyeol.command):
+            punishment_kwargs["name_localizations"] = {"ko": "처벌정보전송"}
+            punishment_kwargs["description_localizations"] = {
+                "ko": "처벌 정보를 채널에 전송하고 데이터베이스에 저장합니다."
+            }
+
+        @self.hanbyeol.command(**punishment_kwargs)
         @role_required(self.config.punishment_role_id)
         async def send_punishment(
             interaction: discord.Interaction,
@@ -84,12 +104,17 @@ class HanbyeolBot(commands.Bot):
             await channel.send(embed=embed)
             await interaction.followup.send("처벌 정보를 전송하고 저장했습니다.", ephemeral=True)
 
-        @self.hanbyeol.command(
-            name="send_punishment_release",
-            description="Send a punishment release notification to the configured channel.",
-            name_localizations={"ko": "처벌해제정보전송"},
-            description_localizations={"ko": "처벌 해제 정보를 채널에 전송하고 데이터베이스에 저장합니다."},
-        )
+        release_kwargs: dict[str, object] = {
+            "name": "send_punishment_release",
+            "description": "Send a punishment release notification to the configured channel.",
+        }
+        if _supports_localizations(self.hanbyeol.command):
+            release_kwargs["name_localizations"] = {"ko": "처벌해제정보전송"}
+            release_kwargs["description_localizations"] = {
+                "ko": "처벌 해제 정보를 채널에 전송하고 데이터베이스에 저장합니다."
+            }
+
+        @self.hanbyeol.command(**release_kwargs)
         @role_required(self.config.punishment_role_id)
         async def send_punishment_release(
             interaction: discord.Interaction,
@@ -117,12 +142,17 @@ class HanbyeolBot(commands.Bot):
             await channel.send(embed=embed)
             await interaction.followup.send("처벌 해제 정보를 전송하고 저장했습니다.", ephemeral=True)
 
-        @self.hanbyeol.command(
-            name="punishment_log",
-            description="Inspect stored punishment logs.",
-            name_localizations={"ko": "처벌로그"},
-            description_localizations={"ko": "저장된 처벌 로그를 확인합니다."},
-        )
+        log_kwargs: dict[str, object] = {
+            "name": "punishment_log",
+            "description": "Inspect stored punishment logs.",
+        }
+        if _supports_localizations(self.hanbyeol.command):
+            log_kwargs["name_localizations"] = {"ko": "처벌로그"}
+            log_kwargs["description_localizations"] = {
+                "ko": "저장된 처벌 로그를 확인합니다."
+            }
+
+        @self.hanbyeol.command(**log_kwargs)
         @role_required(self.config.log_role_id)
         async def punishment_log(
             interaction: discord.Interaction, count: app_commands.Range[int, 1, 10]
