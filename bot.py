@@ -5,6 +5,7 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 from discord.ext import commands
+from dotenv import load_dotenv
 
 from adminbot.config import BotConfig
 from adminbot.database import Database, format_entries
@@ -176,6 +177,7 @@ class HanbyeolBot(commands.Bot):
 
 
 def main() -> None:
+    load_dotenv()
     config = BotConfig.from_env()
     bot = HanbyeolBot(config=config)
     bot.run(config.token)
