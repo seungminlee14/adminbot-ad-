@@ -5,7 +5,9 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 from discord.ext import commands
-from dotenv import load_dotenv
+from pathlib import Path
+
+from dotenv import find_dotenv, load_dotenv
 
 from adminbot.config import BotConfig
 from adminbot.database import Database, format_entries
@@ -176,8 +178,20 @@ class HanbyeolBot(commands.Bot):
             raise error
 
 
+def load_environment() -> None:
+    """Load environment variables from a local `.env` file if present."""
+
+    project_root = Path(__file__).resolve().parent
+    env_path = project_root / ".env"
+    loaded = False
+    if env_path.exists():
+        loaded = load_dotenv(env_path)
+    if not loaded:
+        load_dotenv(find_dotenv())
+
+
 def main() -> None:
-    load_dotenv()
+    load_environment()
     config = BotConfig.from_env()
     bot = HanbyeolBot(config=config)
     bot.run(config.token)
