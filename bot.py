@@ -26,6 +26,26 @@ def _supports_localizations(callable_obj) -> bool:
     return "name_localizations" in params and "description_localizations" in params
 
 
+class PermissionCheckFailure(app_commands.CheckFailure):
+    """Raised when a role-gated check notifies the user and should be ignored."""
+
+
+def _send_permission_denied_message() -> str:
+    """Return the standard permission denied message."""
+
+    return "이 명령어를 실행할 권한이 없습니다."
+
+
+async def _reply_permission_denied(interaction: discord.Interaction) -> None:
+    """Send an ephemeral permission denied response if possible."""
+
+    message = _send_permission_denied_message()
+    if interaction.response.is_done():
+        await interaction.followup.send(message, ephemeral=True)
+    else:
+        await interaction.response.send_message(message, ephemeral=True)
+
+
 def role_required(role_id: int) -> app_commands.Check:
     """Restrict a slash command to members with a specific role."""
 
@@ -34,7 +54,9 @@ def role_required(role_id: int) -> app_commands.Check:
             raise app_commands.CheckFailure("길드 내에서만 사용할 수 있는 명령어입니다.")
         if any(role.id == role_id for role in interaction.user.roles):
             return True
-        raise app_commands.CheckFailure("이 명령어를 실행할 권한이 없습니다.")
+
+        await _reply_permission_denied(interaction)
+        raise PermissionCheckFailure(_send_permission_denied_message())
 
     return app_commands.check(predicate)
 
@@ -64,6 +86,25 @@ class HanbyeolBot(commands.Bot):
         self.tree.add_command(self.hanbyeol)
 
         self._register_commands()
+
+    async def on_app_command_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ) -> None:
+        """Handle application command errors gracefully."""
+
+        if isinstance(error, PermissionCheckFailure):
+            # 이미 에페메랄 메시지를 보냈으므로 추가 처리는 필요하지 않습니다.
+            return
+
+        if isinstance(error, app_commands.CheckFailure):
+            # 다른 종류의 권한 오류는 사용자에게 에페메랄 메시지로 전달합니다.
+            if interaction.response.is_done():
+                await interaction.followup.send(str(error), ephemeral=True)
+            else:
+                await interaction.response.send_message(str(error), ephemeral=True)
+            return
+
+        raise error
 
     def _register_commands(self) -> None:
         punishment_kwargs: dict[str, object] = {
@@ -210,23 +251,6 @@ class HanbyeolBot(commands.Bot):
     async def on_ready(self) -> None:
         await self.change_presence(activity=discord.Game(name="한별 서버 관리"))
         print(f"Logged in as {self.user} (ID: {self.user.id})")
-
-    async def on_app_command_error(
-        self, interaction: discord.Interaction, error: app_commands.AppCommandError
-    ) -> None:
-        if isinstance(error, app_commands.CheckFailure):
-            message = str(error)
-            if interaction.response.is_done():
-                await interaction.followup.send(message, ephemeral=True)
-            else:
-                await interaction.response.send_message(message, ephemeral=True)
-            return
-        handler = getattr(super(), "on_app_command_error", None)
-        if handler:
-            await handler(interaction, error)
-        else:
-            raise error
-
 
 def load_environment() -> None:
     """Load environment variables from a local `.env` file if present."""
