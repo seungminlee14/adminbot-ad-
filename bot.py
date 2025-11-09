@@ -1,0 +1,275 @@
+"""Entry point for the Hanbyeol administration Discord bot."""
+
+from __future__ import annotations
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+from pathlib import Path
+
+from dotenv import find_dotenv, load_dotenv
+
+from inspect import signature
+
+from adminbot.config import BotConfig
+from adminbot.database import Database, format_entries
+from adminbot.embeds import log_embed, punishment_embed, release_embed
+
+
+def _supports_localizations(callable_obj) -> bool:
+    """Return True if the callable accepts localization keyword arguments."""
+
+    try:
+        params = signature(callable_obj).parameters
+    except (TypeError, ValueError):
+        return False
+    return "name_localizations" in params and "description_localizations" in params
+
+
+class PermissionCheckFailure(app_commands.CheckFailure):
+    """Raised when a role-gated check notifies the user and should be ignored."""
+
+
+def _send_permission_denied_message() -> str:
+    """Return the standard permission denied message."""
+
+    return "이 명령어를 실행할 권한이 없습니다."
+
+
+async def _reply_permission_denied(interaction: discord.Interaction) -> None:
+    """Send an ephemeral permission denied response if possible."""
+
+    message = _send_permission_denied_message()
+    if interaction.response.is_done():
+        await interaction.followup.send(message, ephemeral=True)
+    else:
+        await interaction.response.send_message(message, ephemeral=True)
+
+
+def role_required(role_id: int) -> app_commands.Check:
+    """Restrict a slash command to members with a specific role."""
+
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if not isinstance(interaction.user, discord.Member):
+            raise app_commands.CheckFailure("길드 내에서만 사용할 수 있는 명령어입니다.")
+        if any(role.id == role_id for role in interaction.user.roles):
+            return True
+
+        await _reply_permission_denied(interaction)
+        raise PermissionCheckFailure(_send_permission_denied_message())
+
+    return app_commands.check(predicate)
+
+
+class HanbyeolBot(commands.Bot):
+    """Discord bot that manages punishment reports for the Hanbyeol server."""
+
+    def __init__(self, *, config: BotConfig) -> None:
+        intents = discord.Intents.default()
+        intents.members = True
+        super().__init__(command_prefix="!", intents=intents)
+        self.config = config
+        self.database = Database(config.database_path)
+
+        group_kwargs: dict[str, object] = {
+            "name": "hanbyeol",
+            "description": "한별 서버 관리 명령어.",
+        }
+        if _supports_localizations(app_commands.Group.__init__):
+            group_kwargs["name_localizations"] = {"ko": "한별"}
+            group_kwargs["description_localizations"] = {
+                "en-US": "Hanbyeol administration commands.",
+                "en-GB": "Hanbyeol administration commands.",
+            }
+
+        self.hanbyeol = app_commands.Group(**group_kwargs)
+        self.tree.add_command(self.hanbyeol)
+
+        self._register_commands()
+
+    async def on_app_command_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ) -> None:
+        """Handle application command errors gracefully."""
+
+        if isinstance(error, PermissionCheckFailure):
+            # 이미 에페메랄 메시지를 보냈으므로 추가 처리는 필요하지 않습니다.
+            return
+
+        if isinstance(error, app_commands.CheckFailure):
+            # 다른 종류의 권한 오류는 사용자에게 에페메랄 메시지로 전달합니다.
+            if interaction.response.is_done():
+                await interaction.followup.send(str(error), ephemeral=True)
+            else:
+                await interaction.response.send_message(str(error), ephemeral=True)
+            return
+
+        raise error
+
+    def _register_commands(self) -> None:
+        punishment_kwargs: dict[str, object] = {
+            "name": "send_punishment",
+            "description": "처벌 정보를 채널에 전송하고 데이터베이스에 저장합니다.",
+        }
+        if _supports_localizations(self.hanbyeol.command):
+            punishment_kwargs["name_localizations"] = {"ko": "처벌정보전송"}
+            punishment_kwargs["description_localizations"] = {
+                "en-US": "Send a punishment notification to the configured channel.",
+                "en-GB": "Send a punishment notification to the configured channel.",
+            }
+
+        @self.hanbyeol.command(**punishment_kwargs)
+        @role_required(self.config.punishment_role_id)
+        @app_commands.describe(
+            user="처벌할 대상 유저",
+            punishment="적용할 처벌 종류",
+            reason="처벌 사유",
+            duration="처벌 기간 (선택 사항)",
+        )
+        async def send_punishment(
+            interaction: discord.Interaction,
+            user: discord.Member,
+            punishment: str,
+            reason: str,
+            duration: str | None = None,
+        ) -> None:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            await self.database.log_punishment(
+                user_id=user.id,
+                user_name=str(user),
+                punishment=punishment,
+                reason=reason,
+                duration=duration,
+                moderator_id=interaction.user.id,
+                moderator_name=str(interaction.user),
+            )
+
+            channel = await self._resolve_channel()
+            embed = punishment_embed(
+                user=user,
+                punishment=punishment,
+                reason=reason,
+                duration=duration,
+                moderator=interaction.user,
+            )
+            await channel.send(embed=embed)
+            await interaction.followup.send("처벌 정보를 전송하고 저장했습니다.", ephemeral=True)
+
+        release_kwargs: dict[str, object] = {
+            "name": "send_punishment_release",
+            "description": "처벌 해제 정보를 채널에 전송하고 데이터베이스에 저장합니다.",
+        }
+        if _supports_localizations(self.hanbyeol.command):
+            release_kwargs["name_localizations"] = {"ko": "처벌해제정보전송"}
+            release_kwargs["description_localizations"] = {
+                "en-US": "Send a punishment release notification to the configured channel.",
+                "en-GB": "Send a punishment release notification to the configured channel.",
+            }
+
+        @self.hanbyeol.command(**release_kwargs)
+        @role_required(self.config.punishment_role_id)
+        @app_commands.describe(
+            user="처벌 해제 대상 유저",
+            punishment="해제하는 처벌 종류",
+            reason="처벌 해제 사유",
+        )
+        async def send_punishment_release(
+            interaction: discord.Interaction,
+            user: discord.Member,
+            punishment: str,
+            reason: str,
+        ) -> None:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            await self.database.log_release(
+                user_id=user.id,
+                user_name=str(user),
+                punishment=punishment,
+                reason=reason,
+                moderator_id=interaction.user.id,
+                moderator_name=str(interaction.user),
+            )
+
+            channel = await self._resolve_channel()
+            embed = release_embed(
+                user=user,
+                punishment=punishment,
+                reason=reason,
+                moderator=interaction.user,
+            )
+            await channel.send(embed=embed)
+            await interaction.followup.send("처벌 해제 정보를 전송하고 저장했습니다.", ephemeral=True)
+
+        log_kwargs: dict[str, object] = {
+            "name": "punishment_log",
+            "description": "저장된 처벌 로그를 확인합니다.",
+        }
+        if _supports_localizations(self.hanbyeol.command):
+            log_kwargs["name_localizations"] = {"ko": "처벌로그"}
+            log_kwargs["description_localizations"] = {
+                "en-US": "Inspect stored punishment logs.",
+                "en-GB": "Inspect stored punishment logs.",
+            }
+
+        @self.hanbyeol.command(**log_kwargs)
+        @role_required(self.config.log_role_id)
+        @app_commands.describe(
+            count="최근 내역을 몇 묶음(5개 단위) 확인할지 지정합니다.",
+        )
+        async def punishment_log(
+            interaction: discord.Interaction, count: app_commands.Range[int, 1, 10]
+        ) -> None:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            limit = min(50, count * 5)
+            punishments = await self.database.get_recent_punishments(limit)
+            releases = await self.database.get_recent_releases(limit)
+
+            embed = log_embed(
+                punishments=format_entries(punishments),
+                releases=format_entries(releases),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _resolve_channel(self) -> discord.TextChannel:
+        """Resolve the announcement channel, fetching it if necessary."""
+
+        channel = self.get_channel(self.config.announcement_channel_id)
+        if channel is None:
+            channel = await self.fetch_channel(self.config.announcement_channel_id)
+        if not isinstance(channel, discord.TextChannel):
+            raise RuntimeError("처벌 공지 채널을 텍스트 채널로 찾을 수 없습니다.")
+        return channel
+
+    async def setup_hook(self) -> None:
+        await self.database.setup()
+        await super().setup_hook()
+        if self.config.guild_id:
+            guild = discord.Object(id=self.config.guild_id)
+            await self.tree.sync(guild=guild)
+        else:
+            await self.tree.sync()
+
+    async def on_ready(self) -> None:
+        await self.change_presence(activity=discord.Game(name="한별 서버 관리"))
+        print(f"Logged in as {self.user} (ID: {self.user.id})")
+
+def load_environment() -> None:
+    """Load environment variables from a local `.env` file if present."""
+
+    project_root = Path(__file__).resolve().parent
+    env_path = project_root / ".env"
+    loaded = False
+    if env_path.exists():
+        loaded = load_dotenv(env_path)
+    if not loaded:
+        load_dotenv(find_dotenv())
+
+
+def main() -> None:
+    load_environment()
+    config = BotConfig.from_env()
+    bot = HanbyeolBot(config=config)
+    bot.run(config.token)
+
+
+if __name__ == "__main__":
+    main()
