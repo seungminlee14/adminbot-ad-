@@ -51,11 +51,14 @@ class HanbyeolBot(commands.Bot):
 
         group_kwargs: dict[str, object] = {
             "name": "hanbyeol",
-            "description": "Hanbyeol administration commands.",
+            "description": "한별 서버 관리 명령어.",
         }
         if _supports_localizations(app_commands.Group.__init__):
             group_kwargs["name_localizations"] = {"ko": "한별"}
-            group_kwargs["description_localizations"] = {"ko": "한별 서버 관리 명령어."}
+            group_kwargs["description_localizations"] = {
+                "en-US": "Hanbyeol administration commands.",
+                "en-GB": "Hanbyeol administration commands.",
+            }
 
         self.hanbyeol = app_commands.Group(**group_kwargs)
         self.tree.add_command(self.hanbyeol)
@@ -65,16 +68,23 @@ class HanbyeolBot(commands.Bot):
     def _register_commands(self) -> None:
         punishment_kwargs: dict[str, object] = {
             "name": "send_punishment",
-            "description": "Send a punishment notification to the configured channel.",
+            "description": "처벌 정보를 채널에 전송하고 데이터베이스에 저장합니다.",
         }
         if _supports_localizations(self.hanbyeol.command):
             punishment_kwargs["name_localizations"] = {"ko": "처벌정보전송"}
             punishment_kwargs["description_localizations"] = {
-                "ko": "처벌 정보를 채널에 전송하고 데이터베이스에 저장합니다."
+                "en-US": "Send a punishment notification to the configured channel.",
+                "en-GB": "Send a punishment notification to the configured channel.",
             }
 
         @self.hanbyeol.command(**punishment_kwargs)
         @role_required(self.config.punishment_role_id)
+        @app_commands.describe(
+            user="처벌할 대상 유저",
+            punishment="적용할 처벌 종류",
+            reason="처벌 사유",
+            duration="처벌 기간 (선택 사항)",
+        )
         async def send_punishment(
             interaction: discord.Interaction,
             user: discord.Member,
@@ -106,16 +116,22 @@ class HanbyeolBot(commands.Bot):
 
         release_kwargs: dict[str, object] = {
             "name": "send_punishment_release",
-            "description": "Send a punishment release notification to the configured channel.",
+            "description": "처벌 해제 정보를 채널에 전송하고 데이터베이스에 저장합니다.",
         }
         if _supports_localizations(self.hanbyeol.command):
             release_kwargs["name_localizations"] = {"ko": "처벌해제정보전송"}
             release_kwargs["description_localizations"] = {
-                "ko": "처벌 해제 정보를 채널에 전송하고 데이터베이스에 저장합니다."
+                "en-US": "Send a punishment release notification to the configured channel.",
+                "en-GB": "Send a punishment release notification to the configured channel.",
             }
 
         @self.hanbyeol.command(**release_kwargs)
         @role_required(self.config.punishment_role_id)
+        @app_commands.describe(
+            user="처벌 해제 대상 유저",
+            punishment="해제하는 처벌 종류",
+            reason="처벌 해제 사유",
+        )
         async def send_punishment_release(
             interaction: discord.Interaction,
             user: discord.Member,
@@ -144,16 +160,20 @@ class HanbyeolBot(commands.Bot):
 
         log_kwargs: dict[str, object] = {
             "name": "punishment_log",
-            "description": "Inspect stored punishment logs.",
+            "description": "저장된 처벌 로그를 확인합니다.",
         }
         if _supports_localizations(self.hanbyeol.command):
             log_kwargs["name_localizations"] = {"ko": "처벌로그"}
             log_kwargs["description_localizations"] = {
-                "ko": "저장된 처벌 로그를 확인합니다."
+                "en-US": "Inspect stored punishment logs.",
+                "en-GB": "Inspect stored punishment logs.",
             }
 
         @self.hanbyeol.command(**log_kwargs)
         @role_required(self.config.log_role_id)
+        @app_commands.describe(
+            count="최근 내역을 몇 묶음(5개 단위) 확인할지 지정합니다.",
+        )
         async def punishment_log(
             interaction: discord.Interaction, count: app_commands.Range[int, 1, 10]
         ) -> None:
