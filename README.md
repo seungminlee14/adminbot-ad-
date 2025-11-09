@@ -1,6 +1,6 @@
 # Hanbyeol Administration Bot
 
-디스코드 한별 서버를 위한 관리용 봇입니다. 봇은 처벌 내역을 전송하고 데이터베이스에 저장하며, 누가 명령어를 사용할 수 있는지도 역할 기반으로 제한합니다.
+디스코드 한별 서버를 위한 관리용 봇입니다. 봇은 처벌 내역을 전송하고 텍스트 파일(메모장 형태)에 기록하며, 누가 명령어를 사용할 수 있는지도 역할 기반으로 제한합니다.
 
 ## 요구 사항
 
@@ -32,7 +32,7 @@ DISCORD_BOT_TOKEN=디스코드_봇_토큰
 | `HANBYEOL_ANNOUNCEMENT_CHANNEL` | 선택. 처벌/해제 내역을 올릴 채널 ID (기본값: `1434881803075846286`) |
 | `HANBYEOL_PUNISHMENT_ROLE` | 선택. 처벌 관련 명령어 사용 가능 역할 ID (기본값: `1434877200208756897`) |
 | `HANBYEOL_LOG_ROLE` | 선택. 로그 열람 명령어 사용 가능 역할 ID (기본값: `1434877292546621602`) |
-| `HANBYEOL_DATABASE` | 선택. SQLite 데이터베이스 파일 경로 (기본값: `hanbyeol.db`) |
+| `HANBYEOL_DATABASE` | 선택. 로그를 저장할 텍스트 파일 경로 (기본값: `hanbyeol_logs.txt`) |
 
 ## 실행 방법
 
@@ -49,13 +49,13 @@ python bot.py
 
 - 역할 `1434877200208756897` (또는 `HANBYEOL_PUNISHMENT_ROLE`) 보유자만 실행 가능
 - 채널 `1434881803075846286` (또는 `HANBYEOL_ANNOUNCEMENT_CHANNEL`) 에 빨간색 임베드 전송
-- 데이터베이스 `punishments` 테이블에 기록
+- 로그 파일에 처벌 내역을 JSON 줄 형식으로 기록
 
 ### `/한별 처벌해제정보전송`
 
 - 역할 `1434877200208756897` (또는 `HANBYEOL_PUNISHMENT_ROLE`) 보유자만 실행 가능
 - 채널 `1434881803075846286` 에 파란색 임베드 전송
-- 데이터베이스 `punishment_releases` 테이블에 기록
+- 로그 파일에 처벌 해제 내역을 JSON 줄 형식으로 기록
 
 ### `/한별 처벌로그`
 
@@ -63,11 +63,12 @@ python bot.py
 - 입력한 숫자 * 5 개의 최신 로그를 조회 (최대 50개)
 - 결과는 슬래시 명령어를 실행한 사용자에게만 보이는 임베드로 반환
 
-## 데이터베이스 구조
+## 로그 파일 구조
 
-봇은 SQLite 를 사용하여 처벌 및 해제 내역을 영구 저장합니다.
+봇은 메모장으로 열 수 있는 일반 텍스트 파일을 데이터 저장소로 사용합니다. 각 줄에는 JSON 객체가 들어 있으며, `kind` 값으로 `punishment` 또는 `release`를 구분합니다. 예시는 다음과 같습니다.
 
-- `punishments`: 처벌 대상, 종류, 사유, 기간, 담당자, 기록 시간 저장
-- `punishment_releases`: 처벌 해제 대상, 종류, 사유, 담당자, 기록 시간 저장
+```json
+{"kind": "punishment", "user_id": 123, "user_name": "User#0001", "punishment": "밴", "reason": "욕설", "duration": "7일", "moderator_id": 456, "moderator_name": "Mod#9999", "created_at": "2025-11-09T15:42:00"}
+```
 
-데이터베이스 파일 위치는 `HANBYEOL_DATABASE` 환경 변수로 변경할 수 있습니다.
+`HANBYEOL_DATABASE` 환경 변수로 파일 경로를 원하는 위치/이름으로 변경할 수 있습니다.
