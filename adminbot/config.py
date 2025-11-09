@@ -39,7 +39,7 @@ class BotConfig:
         log_role_id = int(
             os.environ.get("HANBYEOL_LOG_ROLE", "1434877292546621602")
         )
-        database_path = os.environ.get("HANBYEOL_DATABASE", "hanbyeol.db")
+        database_path = os.environ.get("HANBYEOL_DATABASE", "hanbyeol_logs.txt")
 
         return cls(
             token=token,

@@ -26,39 +26,24 @@ def _supports_localizations(callable_obj) -> bool:
     return "name_localizations" in params and "description_localizations" in params
 
 
-class PermissionCheckFailure(app_commands.CheckFailure):
-    """Raised when a role-gated check notifies the user and should be ignored."""
-
-
-def _send_permission_denied_message() -> str:
-    """Return the standard permission denied message."""
-
-    return "이 명령어를 실행할 권한이 없습니다."
-
-
 async def _reply_permission_denied(interaction: discord.Interaction) -> None:
     """Send an ephemeral permission denied response if possible."""
 
-    message = _send_permission_denied_message()
+    message = "이 명령어를 실행할 권한이 없습니다."
     if interaction.response.is_done():
         await interaction.followup.send(message, ephemeral=True)
     else:
         await interaction.response.send_message(message, ephemeral=True)
 
 
-def role_required(role_id: int) -> app_commands.Check:
-    """Restrict a slash command to members with a specific role."""
+async def _reply_guild_only(interaction: discord.Interaction) -> None:
+    """Send an ephemeral message when a command is limited to guilds."""
 
-    async def predicate(interaction: discord.Interaction) -> bool:
-        if not isinstance(interaction.user, discord.Member):
-            raise app_commands.CheckFailure("길드 내에서만 사용할 수 있는 명령어입니다.")
-        if any(role.id == role_id for role in interaction.user.roles):
-            return True
-
-        await _reply_permission_denied(interaction)
-        raise PermissionCheckFailure(_send_permission_denied_message())
-
-    return app_commands.check(predicate)
+    message = "길드 내에서만 사용할 수 있는 명령어입니다."
+    if interaction.response.is_done():
+        await interaction.followup.send(message, ephemeral=True)
+    else:
+        await interaction.response.send_message(message, ephemeral=True)
 
 
 class HanbyeolBot(commands.Bot):
@@ -92,12 +77,7 @@ class HanbyeolBot(commands.Bot):
     ) -> None:
         """Handle application command errors gracefully."""
 
-        if isinstance(error, PermissionCheckFailure):
-            # 이미 에페메랄 메시지를 보냈으므로 추가 처리는 필요하지 않습니다.
-            return
-
         if isinstance(error, app_commands.CheckFailure):
-            # 다른 종류의 권한 오류는 사용자에게 에페메랄 메시지로 전달합니다.
             if interaction.response.is_done():
                 await interaction.followup.send(str(error), ephemeral=True)
             else:
@@ -105,6 +85,21 @@ class HanbyeolBot(commands.Bot):
             return
 
         raise error
+
+    async def _ensure_role(
+        self, interaction: discord.Interaction, *, required_role_id: int
+    ) -> bool:
+        """Verify that the invoker has the required role and notify if not."""
+
+        if not isinstance(interaction.user, discord.Member):
+            await _reply_guild_only(interaction)
+            return False
+
+        if any(role.id == required_role_id for role in interaction.user.roles):
+            return True
+
+        await _reply_permission_denied(interaction)
+        return False
 
     def _register_commands(self) -> None:
         punishment_kwargs: dict[str, object] = {
@@ -119,7 +114,6 @@ class HanbyeolBot(commands.Bot):
             }
 
         @self.hanbyeol.command(**punishment_kwargs)
-        @role_required(self.config.punishment_role_id)
         @app_commands.describe(
             user="처벌할 대상 유저",
             punishment="적용할 처벌 종류",
@@ -133,6 +127,11 @@ class HanbyeolBot(commands.Bot):
             reason: str,
             duration: str | None = None,
         ) -> None:
+            if not await self._ensure_role(
+                interaction, required_role_id=self.config.punishment_role_id
+            ):
+                return
+
             await interaction.response.defer(ephemeral=True, thinking=True)
             await self.database.log_punishment(
                 user_id=user.id,
@@ -167,7 +166,6 @@ class HanbyeolBot(commands.Bot):
             }
 
         @self.hanbyeol.command(**release_kwargs)
-        @role_required(self.config.punishment_role_id)
         @app_commands.describe(
             user="처벌 해제 대상 유저",
             punishment="해제하는 처벌 종류",
@@ -179,6 +177,11 @@ class HanbyeolBot(commands.Bot):
             punishment: str,
             reason: str,
         ) -> None:
+            if not await self._ensure_role(
+                interaction, required_role_id=self.config.punishment_role_id
+            ):
+                return
+
             await interaction.response.defer(ephemeral=True, thinking=True)
             await self.database.log_release(
                 user_id=user.id,
@@ -211,13 +214,17 @@ class HanbyeolBot(commands.Bot):
             }
 
         @self.hanbyeol.command(**log_kwargs)
-        @role_required(self.config.log_role_id)
         @app_commands.describe(
             count="최근 내역을 몇 묶음(5개 단위) 확인할지 지정합니다.",
         )
         async def punishment_log(
             interaction: discord.Interaction, count: app_commands.Range[int, 1, 10]
         ) -> None:
+            if not await self._ensure_role(
+                interaction, required_role_id=self.config.log_role_id
+            ):
+                return
+
             await interaction.response.defer(ephemeral=True, thinking=True)
             limit = min(50, count * 5)
             punishments = await self.database.get_recent_punishments(limit)
