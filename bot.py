@@ -75,6 +75,20 @@ class HanbyeolBot(commands.Bot):
 
         self._register_commands()
 
+    async def _safe_send_dm(
+        self,
+        recipient: discord.abc.Messageable,
+        *,
+        content: str | None = None,
+        embed: discord.Embed | None = None,
+    ) -> None:
+        """Attempt to send a DM and silently ignore delivery issues."""
+
+        try:
+            await recipient.send(content=content, embed=embed)
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
     async def on_app_command_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ) -> None:
@@ -158,6 +172,16 @@ class HanbyeolBot(commands.Bot):
                 moderator=interaction.user,
             )
             await channel.send(embed=embed)
+            await self._safe_send_dm(
+                user,
+                content="한별 서버에서 다음 처벌이 적용되었습니다.",
+                embed=embed.copy(),
+            )
+            await self._safe_send_dm(
+                interaction.user,
+                content="처벌 정보가 성공적으로 전송되었습니다.",
+                embed=embed.copy(),
+            )
             await interaction.followup.send("처벌 정보를 전송하고 저장했습니다.", ephemeral=True)
 
         release_kwargs: dict[str, object] = {
@@ -209,6 +233,16 @@ class HanbyeolBot(commands.Bot):
                 moderator=interaction.user,
             )
             await channel.send(embed=embed)
+            await self._safe_send_dm(
+                user,
+                content="한별 서버에서 처벌이 해제되었습니다.",
+                embed=embed.copy(),
+            )
+            await self._safe_send_dm(
+                interaction.user,
+                content="처벌 해제 정보가 성공적으로 전송되었습니다.",
+                embed=embed.copy(),
+            )
             await interaction.followup.send("처벌 해제 정보를 전송하고 저장했습니다.", ephemeral=True)
 
         log_kwargs: dict[str, object] = {
