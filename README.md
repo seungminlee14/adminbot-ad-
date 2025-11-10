@@ -30,7 +30,7 @@ DISCORD_BOT_TOKEN=디스코드_봇_토큰
 | `DISCORD_BOT_TOKEN` | 필수. 디스코드 봇 토큰 |
 | `DISCORD_GUILD_ID` | 선택. 특정 길드에만 명령어를 동기화하고 싶을 때 사용 |
 | `HANBYEOL_ANNOUNCEMENT_CHANNEL` | 선택. 처벌/해제 내역을 올릴 채널 ID (기본값: `1434881803075846286`) |
-| `HANBYEOL_PUNISHMENT_ROLE` | 선택. 처벌 관련 명령어 사용 가능 역할 ID (기본값: `1434877200208756897`) |
+| `HANBYEOL_PUNISHMENT_ROLE` | 선택. 모든 명령어를 사용할 수 있는 관리자 역할 ID (기본값: `1434877292546621602`) |
 | `HANBYEOL_LOG_ROLE` | 선택. 로그 열람 명령어 사용 가능 역할 ID (기본값: `1434877292546621602`) |
 | `HANBYEOL_DATABASE` | 선택. 로그를 저장할 텍스트 파일 경로 (기본값: `hanbyeol_logs.txt`) |
 
@@ -47,13 +47,13 @@ python bot.py
 
 ### `/한별 처벌정보전송`
 
-- 역할 `1434877200208756897` (또는 `HANBYEOL_PUNISHMENT_ROLE`) 보유자만 실행 가능
+- 역할 `1434877292546621602` (또는 `HANBYEOL_PUNISHMENT_ROLE`) 보유자만 실행 가능
 - 채널 `1434881803075846286` (또는 `HANBYEOL_ANNOUNCEMENT_CHANNEL`) 에 빨간색 임베드 전송
 - 로그 파일에 처벌 내역을 JSON 줄 형식으로 기록
 
 ### `/한별 처벌해제정보전송`
 
-- 역할 `1434877200208756897` (또는 `HANBYEOL_PUNISHMENT_ROLE`) 보유자만 실행 가능
+- 역할 `1434877292546621602` (또는 `HANBYEOL_PUNISHMENT_ROLE`) 보유자만 실행 가능
 - 채널 `1434881803075846286` 에 파란색 임베드 전송
 - 로그 파일에 처벌 해제 내역을 JSON 줄 형식으로 기록
 

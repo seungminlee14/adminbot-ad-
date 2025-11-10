@@ -34,7 +34,7 @@ class BotConfig:
             os.environ.get("HANBYEOL_ANNOUNCEMENT_CHANNEL", "1434881803075846286")
         )
         punishment_role_id = int(
-            os.environ.get("HANBYEOL_PUNISHMENT_ROLE", "1434877200208756897")
+            os.environ.get("HANBYEOL_PUNISHMENT_ROLE", "1434877292546621602")
         )
         log_role_id = int(
             os.environ.get("HANBYEOL_LOG_ROLE", "1434877292546621602")
