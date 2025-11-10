@@ -57,11 +57,14 @@ class HanbyeolBot(commands.Bot):
         self.database = Database(config.database_path)
 
         group_kwargs: dict[str, object] = {
-            "name": "hanbyeol",
+            "name": "한별",
             "description": "한별 서버 관리 명령어.",
         }
         if _supports_localizations(app_commands.Group.__init__):
-            group_kwargs["name_localizations"] = {"ko": "한별"}
+            group_kwargs["name_localizations"] = {
+                "en-US": "hanbyeol",
+                "en-GB": "hanbyeol",
+            }
             group_kwargs["description_localizations"] = {
                 "en-US": "Hanbyeol administration commands.",
                 "en-GB": "Hanbyeol administration commands.",
@@ -103,11 +106,14 @@ class HanbyeolBot(commands.Bot):
 
     def _register_commands(self) -> None:
         punishment_kwargs: dict[str, object] = {
-            "name": "send_punishment",
+            "name": "처벌정보전송",
             "description": "처벌 정보를 채널에 전송하고 데이터베이스에 저장합니다.",
         }
         if _supports_localizations(self.hanbyeol.command):
-            punishment_kwargs["name_localizations"] = {"ko": "처벌정보전송"}
+            punishment_kwargs["name_localizations"] = {
+                "en-US": "send_punishment",
+                "en-GB": "send_punishment",
+            }
             punishment_kwargs["description_localizations"] = {
                 "en-US": "Send a punishment notification to the configured channel.",
                 "en-GB": "Send a punishment notification to the configured channel.",
@@ -155,11 +161,14 @@ class HanbyeolBot(commands.Bot):
             await interaction.followup.send("처벌 정보를 전송하고 저장했습니다.", ephemeral=True)
 
         release_kwargs: dict[str, object] = {
-            "name": "send_punishment_release",
+            "name": "처벌해제정보전송",
             "description": "처벌 해제 정보를 채널에 전송하고 데이터베이스에 저장합니다.",
         }
         if _supports_localizations(self.hanbyeol.command):
-            release_kwargs["name_localizations"] = {"ko": "처벌해제정보전송"}
+            release_kwargs["name_localizations"] = {
+                "en-US": "send_punishment_release",
+                "en-GB": "send_punishment_release",
+            }
             release_kwargs["description_localizations"] = {
                 "en-US": "Send a punishment release notification to the configured channel.",
                 "en-GB": "Send a punishment release notification to the configured channel.",
@@ -203,11 +212,14 @@ class HanbyeolBot(commands.Bot):
             await interaction.followup.send("처벌 해제 정보를 전송하고 저장했습니다.", ephemeral=True)
 
         log_kwargs: dict[str, object] = {
-            "name": "punishment_log",
+            "name": "처벌로그",
             "description": "저장된 처벌 로그를 확인합니다.",
         }
         if _supports_localizations(self.hanbyeol.command):
-            log_kwargs["name_localizations"] = {"ko": "처벌로그"}
+            log_kwargs["name_localizations"] = {
+                "en-US": "punishment_log",
+                "en-GB": "punishment_log",
+            }
             log_kwargs["description_localizations"] = {
                 "en-US": "Inspect stored punishment logs.",
                 "en-GB": "Inspect stored punishment logs.",
